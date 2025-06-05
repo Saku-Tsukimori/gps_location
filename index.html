@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GPSログインアプリ</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #status { margin-top: 10px; }
+    #log { margin-top: 20px; white-space: pre-wrap; }
+    button { padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>GPSログイン</h1>
+  <button onclick="tryLogin()">ログイン</button>
+  <div id="status">位置情報を取得中...</div>
+  <div id="log"></div>
+
+  <script>
+    // 事前に設定された緯度経度（例: 学校や研究室）
+    const locations = [
+      { name: "図書室", lat: 35.657701, lng: 139.543493 }, // 
+      { name: "西9号館", lat: 35.656782, lng: 139.540457 }  // 
+    ];
+    const DISTANCE_THRESHOLD = 50; // 50m以内でログイン可
+
+    let currentPosition = null;
+
+    // 位置情報を取得
+    navigator.geolocation.watchPosition(
+      (pos) => {
+        currentPosition = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+        document.getElementById("status").textContent = 
+          `現在地: ${currentPosition.lat.toFixed(6)}, ${currentPosition.lng.toFixed(6)}`;
+      },
+      (err) => {
+        document.getElementById("status").textContent = "位置情報の取得に失敗しました";
+      },
+      { enableHighAccuracy: true }
+    );
+
+    // 2点間の距離（メートル）を計算（Haversine公式）
+    function getDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371000; // 地球半径(m)
+      const toRad = (x) => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // ログイン処理
+    function tryLogin() {
+      if (!currentPosition) {
+        alert("現在地が取得できていません");
+        return;
+      }
+
+      for (const loc of locations) {
+        const distance = getDistance(
+          currentPosition.lat, currentPosition.lng,
+          loc.lat, loc.lng
+        );
+
+        if (distance <= DISTANCE_THRESHOLD) {
+          const now = new Date().toLocaleString();
+          const logEntry = `${now} - ${loc.name} にログイン (${distance.toFixed(1)}m)\n`;
+          saveLog(logEntry);
+          document.getElementById("status").textContent = "✅ ログイン成功！";
+          return;
+        }
+      }
+
+      document.getElementById("status").textContent = "❌ 設定地点の範囲外です";
+    }
+
+    // ログを保存・表示
+    function saveLog(entry) {
+      let logs = localStorage.getItem("loginLogs") || "";
+      logs = entry + logs;
+      localStorage.setItem("loginLogs", logs);
+      document.getElementById("log").textContent = logs;
+    }
+
+    // ページ読み込み時にログ表示
+    window.onload = () => {
+      const logs = localStorage.getItem("loginLogs");
+      if (logs) {
+        document.getElementById("log").textContent = logs;
+      }
+    };
+  </script>
+</body>
+</html>
